@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad5d2d3a4b4bf8d4eb4f3c1fca446d92, type: 3}
+  m_Name: Content
+  m_EditorClassIdentifier: 
+  Container:
+    Addons:
+    - name: Common
+      description: '-'
+      author: '-'
+      bundles:
+      - name: Levels
+        assets: []
+      - name: Texts
+        assets: []
+    - name: Terrain
+      description: '-'
+      author: '-'
+      bundles:
+      - name: Data
+        assets: []
+      - name: Shader
+        assets: []
+      - name: Material
+        assets: []
+  BundleCompressionTypes:
+  - addon: Common
+    name: Levels
+    type: 1
+  - addon: Terrain
+    name: Shader
+    type: 1
+  - addon: Terrain
+    name: Data
+    type: 1
+  - addon: Terrain
+    name: Materials
+    type: 3
+  - addon: Terrain
+    name: Material
+    type: 1
+  - addon: Common
+    name: NewBundle_1.bundle
+    type: 1
+  - addon: Common
+    name: Texts
+    type: 0
+  UseAssetDatabase: 0

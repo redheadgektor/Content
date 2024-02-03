@@ -24,7 +24,7 @@ public partial class Content : ScriptableObject
         {
             asset = default;
 
-            if (index < 0 || index > assets.Count)
+            if (index < 0 || index >= assets.Count)
             {
                 return false;
             }
@@ -35,6 +35,11 @@ public partial class Content : ScriptableObject
         }
 
         public int AssetsCount() => assets.Count;
+
+        public void CopyAssets(List<Asset> dest) 
+        { 
+            dest.AddRange(assets);
+        }
 
         public bool HasAsset(
             string value,
@@ -160,6 +165,24 @@ public partial class Content : ScriptableObject
             }
 
             return scenes;
+        }
+
+        public long CalculateBundleSize()
+        {
+            long size = 0;
+            try
+            {
+                for (var i = 0; i < AssetsCount(); i++)
+                {
+                    if (GetAsset(i, out var asset))
+                    {
+                        size += new FileInfo(asset.path).Length;
+                    }
+                }
+            }
+            catch { }
+
+            return size;
         }
     }
 }

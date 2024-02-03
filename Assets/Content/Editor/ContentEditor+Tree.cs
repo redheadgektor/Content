@@ -43,6 +43,17 @@ public partial class ContentEditor : EditorWindow
         private static Texture2D EmptyIcon;
         private static Texture2D FilledIcon;
 
+        public long size { get; private set; } = 0;
+
+        public void UpdateSize()
+        {
+            try
+            {
+                size = bundle.CalculateBundleSize();
+            }
+            catch { }
+        }
+
         private static void CacheIcon()
         {
             if (!EmptyIcon)
@@ -75,6 +86,7 @@ public partial class ContentEditor : EditorWindow
             this.parent = parent;
             this.bundle = bundle;
             UpdateIcon();
+            UpdateSize();
         }
     }
 
@@ -302,7 +314,7 @@ public partial class ContentEditor : EditorWindow
 
                     if (sz >= 1024 * 1024 * 1024)
                     {
-                        sz_s = $"{sz / 1024 / 1024} gb";
+                        sz_s = $"{sz / 1024 / 1024 / 1024} gb";
                     }
 
                     DefaultGUI.Label(cellRect, sz_s, args.selected, args.focused);
@@ -344,6 +356,33 @@ public partial class ContentEditor : EditorWindow
                             args.focused
                         );
                     }
+                    break;
+
+                case 4:
+                    var sz = item.size;
+                    var sz_s = string.Empty;
+
+                    if (sz < 1024)
+                    {
+                        sz_s = $"{sz} B ({item.bundle.AssetsCount()})";
+                    }
+
+                    if (sz >= 1024)
+                    {
+                        sz_s = $"{sz / 1024} KB ({item.bundle.AssetsCount()})";
+                    }
+
+                    if (sz >= 1024 * 1024)
+                    {
+                        sz_s = $"{sz / 1024f / 1024f:f2} MB ({item.bundle.AssetsCount()})";
+                    }
+
+                    if (sz >= 1024 * 1024 * 1024)
+                    {
+                        sz_s = $"{sz / 1024f / 1024f / 1024f:f2} GB ({item.bundle.AssetsCount()})";
+                    }
+
+                    DefaultGUI.Label(cellRect, sz_s, args.selected, args.focused);
                     break;
             }
         }
@@ -625,7 +664,7 @@ public partial class ContentEditor : EditorWindow
             if (item is AddonTreeViewItem)
             {
                 menu.AddItem(
-                    new GUIContent("New Addon"),
+                    new GUIContent("Create/New Addon"),
                     false,
                     delegate
                     {
@@ -637,7 +676,7 @@ public partial class ContentEditor : EditorWindow
                     }
                 );
                 menu.AddItem(
-                    new GUIContent("Add Bundle"),
+                    new GUIContent("Create/Add Bundle"),
                     false,
                     delegate
                     {
@@ -699,13 +738,123 @@ public partial class ContentEditor : EditorWindow
                 var bundle_item = item as BundleTreeViewItem;
                 var addon_item = bundle_item.parent as AddonTreeViewItem;
 
-                var compression = Content.Get().GetCompressionType(addon_item.addon.Name, bundle_item.bundle.name);
+                if (Multiselected)
+                {
+                    var selected_bundles = new List<Content.Bundle>();
+
+                    foreach (var b in MultiSelectedIDs)
+                    {
+                        var selected_item = FindItem(b, rootItem);
+                        if (selected_item is BundleTreeViewItem)
+                        {
+                            var selected_bundle = selected_item as BundleTreeViewItem;
+
+                            if (selected_bundle.parent == addon_item)
+                            {
+                                selected_bundles.Add(selected_bundle.bundle);
+                            }
+                        }
+                    }
+
+                    menu.AddItem(
+                        new GUIContent("Tool/Build (Multiple)"),
+                        false,
+                        delegate
+                        {
+                            Content
+                                .Get()
+                                .BuildMultiple(addon_item.addon, selected_bundles.ToArray());
+                        }
+                    );
+                }
+                else
+                {
+                    menu.AddItem(
+                        new GUIContent("Tool/Build (Single)"),
+                        false,
+                        delegate
+                        {
+                            Content.Get().BuildSingle(addon_item.addon, bundle_item.bundle);
+                        }
+                    );
+                }
+
+                if (Multiselected)
+                {
+                    menu.AddItem(
+                        new GUIContent("Tool/Split Bundles"),
+                        false,
+                        delegate
+                        {
+                            var first_bundle_selected = FindItem(MultiSelectedIDs[0], rootItem);
+                            var bundles_selected = new List<string>();
+
+                            if (first_bundle_selected is BundleTreeViewItem)
+                            {
+                                var first_bundle_item = first_bundle_selected as BundleTreeViewItem;
+                                foreach (var i in MultiSelectedIDs)
+                                {
+                                    var selected_item = FindItem(i, rootItem);
+                                    var bundle_item = selected_item as BundleTreeViewItem;
+
+                                    if (selected_item is BundleTreeViewItem)
+                                    {
+                                        if (selected_item != first_bundle_selected)
+                                        {
+                                            bundles_selected.Add(bundle_item.bundle.name);
+                                        }
+                                    }
+                                }
+                                var splited = addon_item.addon.SplitBundle(
+                                    bundles_selected.ToArray(),
+                                    first_bundle_item.bundle.name
+                                );
+                                Window.ShowNotification(
+                                    new GUIContent(
+                                        $"{splited} bundles splited into {first_bundle_item.bundle.name}"
+                                    ),
+                                    NotifyFadeOutTime
+                                );
+                                Content.SaveToAsset();
+                                Reload();
+                            }
+                        }
+                    );
+                }
+
+                if (!Multiselected)
+                {
+                    menu.AddItem(
+                        new GUIContent("Tool/Slice Bundle"),
+                        false,
+                        delegate
+                        {
+                            OpenSliceMenu(addon_item.addon, bundle_item.bundle);
+                            Content.SaveToAsset();
+                            Reload();
+                        }
+                    );
+                }
+                else
+                {
+                    menu.AddDisabledItem(new GUIContent("Tool/Slice Bundle"));
+                }
+
+                var compression = Content
+                    .Get()
+                    .GetCompressionType(addon_item.addon.Name, bundle_item.bundle.name);
                 menu.AddItem(
                     new GUIContent("Compression/None"),
                     compression == CompressionType.None,
                     delegate
                     {
-                        Content.Get().SetCompressionType(addon_item.addon.Name, bundle_item.bundle.name, CompressionType.None);
+                        Content
+                            .Get()
+                            .SetCompressionType(
+                                addon_item.addon.Name,
+                                bundle_item.bundle.name,
+                                CompressionType.None
+                            );
                         Content.SaveToAsset();
                     }
                 );
@@ -714,7 +863,13 @@ public partial class ContentEditor : EditorWindow
                     compression == CompressionType.Lzma,
                     delegate
                     {
-                        Content.Get().SetCompressionType(addon_item.addon.Name, bundle_item.bundle.name, CompressionType.Lzma);
+                        Content
+                            .Get()
+                            .SetCompressionType(
+                                addon_item.addon.Name,
+                                bundle_item.bundle.name,
+                                CompressionType.Lzma
+                            );
                         Content.SaveToAsset();
                     }
                 );
@@ -723,12 +878,17 @@ public partial class ContentEditor : EditorWindow
                     compression == CompressionType.Lz4,
                     delegate
                     {
-                        Content.Get().SetCompressionType(addon_item.addon.Name, bundle_item.bundle.name, CompressionType.Lz4);
+                        Content
+                            .Get()
+                            .SetCompressionType(
+                                addon_item.addon.Name,
+                                bundle_item.bundle.name,
+                                CompressionType.Lz4
+                            );
                         Content.SaveToAsset();
                     }
                 );
-                menu.AddDisabledItem(new GUIContent("Compression/LZ4HC - Obsolete")
-                );
+                menu.AddDisabledItem(new GUIContent("Compression/LZ4HC - Obsolete"));
             }
 
             menu.ShowAsContext();

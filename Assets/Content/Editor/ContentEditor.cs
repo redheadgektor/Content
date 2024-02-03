@@ -1,4 +1,3 @@
-
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
@@ -18,10 +17,16 @@ public partial class ContentEditor : EditorWindow
 
     Content content;
 
-    private void OnEnable()
+    void OnEnable()
     {
         content = Content.Get();
         Window = this;
+    }
+
+    void OnDisable()
+    {
+        AddonEditorWindow?.Close();
+        SliceMenuWindow?.Close();
     }
 
     void OnFocus()

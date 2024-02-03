@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -38,6 +39,9 @@ public partial class Content : ScriptableObject
         return Instance;
     }
 
+#if UNITY_EDITOR
+    [MenuItem("Content/Load/JSON")]
+#endif
     static void LoadJSON()
     {
         if (File.Exists(ContentFile))
@@ -113,10 +117,114 @@ public partial class Content : ScriptableObject
         AssetDatabase.SaveAssetIfDirty(Get());
     }
 
-    [MenuItem("Content/Start Build")]
-    static void StartBuild() 
+    [MenuItem("Content/Report/Text")]
+    static void TxtReport()
     {
-        Get().Build();
+        using (var sb = new StringWriter())
+        {
+            long total_sz = 0;
+            long total_assets = 0;
+
+            foreach (var addon in Get().Container.Addons)
+            {
+                for (var i = 0; i < addon.BundlesCount(); i++)
+                {
+                    if (addon.GetBundle(i, out var bundle))
+                    {
+                        total_sz += bundle.CalculateBundleSize();
+                        total_assets += bundle.AssetsCount();
+                    }
+                }
+            }
+
+            var total_sz_s = string.Empty;
+
+            if (total_sz < 1024)
+            {
+                total_sz_s = $"{total_sz} B";
+            }
+
+            if (total_sz >= 1024)
+            {
+                total_sz_s = $"{total_sz / 1024} KB";
+            }
+
+            if (total_sz >= 1024 * 1024)
+            {
+                total_sz_s = $"{total_sz / 1024f / 1024f:f2} MB";
+            }
+
+            if (total_sz >= 1024 * 1024 * 1024)
+            {
+                total_sz_s = $"{total_sz / 1024f / 1024f / 1024f:f2} GB";
+            }
+
+            sb.WriteLine($"//Report at {DateTime.Now}");
+            sb.WriteLine(
+                $"//Report contains data only about included assets. Their actual size and number may not match, because during build assets dependencies are automatically included in archives"
+            );
+            sb.WriteLine("//Use Notepad++ with C or C++ syntax for better perception");
+            sb.WriteLine(
+                $"Addons: {Get().AddonsCount()} | Size: {total_sz_s} | Assets: {total_assets}"
+            );
+            foreach (var addon in Get().Container.Addons)
+            {
+                sb.WriteLine($"Addon: [{addon.Name}] | Bundles: {addon.BundlesCount()}");
+                sb.WriteLine("{");
+                for (var i = 0; i < addon.BundlesCount(); i++)
+                {
+                    if (addon.GetBundle(i, out var bundle))
+                    {
+                        var sz = bundle.CalculateBundleSize();
+                        var sz_s = string.Empty;
+
+                        if (sz < 1024)
+                        {
+                            sz_s = $"{sz} B (Assets: {bundle.AssetsCount()})";
+                        }
+
+                        if (sz >= 1024)
+                        {
+                            sz_s = $"{sz / 1024} KB (Assets: {bundle.AssetsCount()})";
+                        }
+
+                        if (sz >= 1024 * 1024)
+                        {
+                            sz_s = $"{sz / 1024f / 1024f:f2} MB (Assets: {bundle.AssetsCount()})";
+                        }
+
+                        if (sz >= 1024 * 1024 * 1024)
+                        {
+                            sz_s =
+                                $"{sz / 1024f / 1024f / 1024f:f2} GB (Assets: {bundle.AssetsCount()})";
+                        }
+
+                        sb.WriteLine($"\nBundle: [{bundle.name}] | Size: {sz_s}");
+                        sb.WriteLine("{");
+                        for (var j = 0; j < bundle.AssetsCount(); j++)
+                        {
+                            if (bundle.GetAsset(j, out var asset))
+                            {
+                                sb.WriteLine($" -  [{asset.base_type}:{asset.type}] {asset.name}");
+                                sb.WriteLine($" -  [guid: {asset.guid}] -> {asset.path}");
+                            }
+                        }
+                        sb.WriteLine("}");
+                    }
+                }
+                sb.WriteLine("}");
+            }
+
+            var p = $"{ContentFolder}/report.log";
+            File.WriteAllText(p, sb.ToString());
+            Debug.Log($"[{nameof(Content)}] Report: {p}");
+        }
+    }
+
+    [MenuItem("Content/Start Build")]
+    static void StartBuild()
+    {
+        Get().BuildAll();
     }
 #endif
 }

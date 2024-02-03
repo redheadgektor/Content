@@ -46,7 +46,7 @@ public partial class Content : ScriptableObject
         {
             bundle = default;
 
-            if (index < 0 || index > bundles.Count)
+            if (index < 0 || index >= bundles.Count)
             {
                 return false;
             }
@@ -121,6 +121,87 @@ public partial class Content : ScriptableObject
             }
 
             return false;
+        }
+
+        public int SliceBundle(string name, int parts = 1)
+        {
+            var sliced = 0;
+            if (HasBundle(name, out var result_bundle))
+            {
+                if (result_bundle.AssetsCount() > 0)
+                {
+                    var temp_assets = new List<Asset>();
+                    result_bundle.CopyAssets(temp_assets);
+
+                    int assetsPerBundle = temp_assets.Count / parts;
+                    int remainder = temp_assets.Count % parts;
+
+                    int currentIndex = 0;
+
+                    for (int i = 0; i < parts; i++)
+                    {
+                        int endIndex = currentIndex + assetsPerBundle;
+
+                        if (remainder > 0)
+                        {
+                            endIndex++;
+                            remainder--;
+                        }
+
+                        var part_assets = temp_assets.GetRange(
+                            currentIndex,
+                            endIndex - currentIndex
+                        );
+                        currentIndex = endIndex;
+
+                        if (part_assets.Count > 0)
+                        {
+                            if (AddBundle($"{result_bundle.name}/Part_{sliced}", out var new_bundle))
+                            {
+                                foreach (var pa in part_assets)
+                                {
+                                    Get().MoveAsset(pa, new_bundle);
+                                }
+                                sliced++;
+                            }
+                        }
+                    }
+                    RemoveBundle(result_bundle.name);
+                }
+            }
+
+            return sliced;
+        }
+
+        public int SplitBundle(string[] source_bundles_name, string dest_name)
+        {
+            var splited = 0;
+            var assets = new List<Asset>();
+            if (HasBundle(dest_name, out var result_dest_bundle))
+            {
+                foreach (var source_name in source_bundles_name)
+                {
+                    if (HasBundle(source_name, out var result_source_bundle))
+                    {
+                        for (var i = 0; i < result_source_bundle.AssetsCount(); i++)
+                        {
+                            if (result_source_bundle.GetAsset(i, out var asset))
+                            {
+                                assets.Add(asset);
+                            }
+                        }
+                        RemoveBundle(source_name);
+                        splited++;
+                    }
+                }
+
+                foreach (var asset in assets)
+                {
+                    result_dest_bundle.AddAsset(asset);
+                }
+            }
+
+            return splited;
         }
     }
 

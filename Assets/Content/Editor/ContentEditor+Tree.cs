@@ -770,6 +770,22 @@ public partial class ContentEditor : EditorWindow
                 else
                 {
                     menu.AddItem(
+                        new GUIContent("Tool/Put in dependencies"),
+                        false,
+                        delegate
+                        {
+                            Content
+                                .Get()
+                                .PutInDependenciesOfBundle(
+                                    bundle_item.bundle.name,
+                                    addon_item.addon
+                                );
+                            Content.SaveToAsset();
+                            Reload();
+                        }
+                    );
+
+                    menu.AddItem(
                         new GUIContent("Tool/Build (Single)"),
                         false,
                         delegate
@@ -889,6 +905,31 @@ public partial class ContentEditor : EditorWindow
                     }
                 );
                 menu.AddDisabledItem(new GUIContent("Compression/LZ4HC - Obsolete"));
+            }
+
+            /* ASSET ITEM */
+            if (item is AssetTreeViewItem)
+            {
+                var bundle_item = item.parent as BundleTreeViewItem;
+                var addon_item = bundle_item.parent as AddonTreeViewItem;
+
+                if (bundle_item != null)
+                {
+                    var asset_item = item as AssetTreeViewItem;
+
+                    menu.AddItem(
+                        new GUIContent("Tool/Put in dependencies"),
+                        false,
+                        delegate
+                        {
+                            Content
+                                .Get()
+                                .PutInDependenciesOfAsset(asset_item.asset.guid, addon_item.addon);
+                            Content.SaveToAsset();
+                            Reload();
+                        }
+                    );
+                }
             }
 
             menu.ShowAsContext();

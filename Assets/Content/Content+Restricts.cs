@@ -28,6 +28,7 @@ public partial class Content
     static readonly HashSet<Type> blackListTypes = new HashSet<Type>
     {
         typeof(Content),
+        typeof(MonoScript),
         typeof(DefaultAsset),
         typeof(AssemblyDefinitionAsset),
         typeof(AssemblyDefinitionReferenceAsset),

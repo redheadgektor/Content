@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 using UnityEngine;
 #if UNITY_EDITOR
@@ -27,10 +28,6 @@ public partial class Content : ScriptableObject
     {
 #if UNITY_EDITOR
         LoadOrCreate();
-        if (!Instance.UseAssetDatabase && EditorApplication.isPlaying)
-        {
-            LoadJSON();
-        }
 #endif
 #if !UNITY_EDITOR
         Instance = CreateInstance<Content>();
@@ -42,7 +39,7 @@ public partial class Content : ScriptableObject
 #if UNITY_EDITOR
     [MenuItem("Content/Load/JSON")]
 #endif
-    static void LoadJSON()
+    public static void LoadJSON()
     {
         if (File.Exists(ContentFile))
         {

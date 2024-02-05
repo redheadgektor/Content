@@ -214,7 +214,7 @@ public partial class Content : ScriptableObject
 
     [HideInInspector]
     [SerializeField]
-    public AddonsContainer Container;
+    public AddonsContainer Container = new AddonsContainer();
 
     public bool GetAddon(int index, out Addon addon)
     {

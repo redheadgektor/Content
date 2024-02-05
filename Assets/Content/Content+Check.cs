@@ -1,10 +1,10 @@
 using System;
+using System.IO;
 using UnityEngine;
 using Object = UnityEngine.Object;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
-
 
 public partial class Content : ScriptableObject
 {
@@ -49,6 +49,58 @@ public partial class Content : ScriptableObject
             default:
                 return "Unknown";
         }
+    }
+
+    public int PutInDependenciesOfAsset(string asset_guid, Addon addon)
+    {
+#if UNITY_EDITOR
+        var assets = AssetDatabase.GetDependencies(AssetDatabase.GUIDToAssetPath(asset_guid));
+
+        var mainAssetName = Path.Combine(AssetDatabase.GUIDToAssetPath(asset_guid));
+
+        foreach (var path in assets)
+        {
+            if (addon.AddOrFindBundle($"{mainAssetName}_Shared", out var bundle))
+            {
+                bundle.AddAsset(AssetDatabase.LoadMainAssetAtPath(path));
+            }
+        }
+#endif
+        return 0;
+    }
+
+    public int PutInDependenciesOfBundle(string bundle_name, Addon addon)
+    {
+#if UNITY_EDITOR
+        if (addon.HasBundle(bundle_name, out var bundle))
+        {
+            void _find_and_add(string asset_guid)
+            {
+                var assets = AssetDatabase.GetDependencies(
+                    AssetDatabase.GUIDToAssetPath(asset_guid)
+                );
+
+                var mainAssetName = Path.Combine(AssetDatabase.GUIDToAssetPath(asset_guid));
+
+                foreach (var path in assets)
+                {
+                    if (addon.AddOrFindBundle($"{bundle.name}_Shared", out var new_bundle))
+                    {
+                        new_bundle.AddAsset(AssetDatabase.LoadMainAssetAtPath(path));
+                    }
+                }
+            }
+
+            for (var i = 0; i < bundle.AssetsCount(); i++)
+            {
+                if (bundle.GetAsset(i, out var asset)) 
+                { 
+                    _find_and_add(asset.guid);
+                }
+            }
+        }
+#endif
+        return 0;
     }
 
     public Status CheckAsset(Object asset, out string guid, out string path, out Type mainType)

@@ -8,6 +8,22 @@ public partial class Content
     {
         public string name;
         public List<BundleInfo> bundles;
+
+        public bool HasBundle(string name, out BundleInfo result)
+        {
+            result = default;
+            for (var i = 0; i < bundles.Count; i++)
+            {
+                var addon = bundles[i];
+
+                if (addon.name == name)
+                {
+                    result = addon;
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     [Serializable]

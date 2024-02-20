@@ -93,8 +93,8 @@ public partial class Content : ScriptableObject
 
             for (var i = 0; i < bundle.AssetsCount(); i++)
             {
-                if (bundle.GetAsset(i, out var asset)) 
-                { 
+                if (bundle.GetAsset(i, out var asset))
+                {
                     _find_and_add(asset.guid);
                 }
             }

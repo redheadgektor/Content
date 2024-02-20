@@ -4,12 +4,12 @@ using System.Collections.Generic;
 public partial class Content
 {
     [Serializable]
-    public struct AddonInfo
+    public struct ChainAddonInfo
     {
         public string name;
-        public List<BundleInfo> bundles;
+        public List<ChainBundleInfo> bundles;
 
-        public bool HasBundle(string name, out BundleInfo result)
+        public bool HasBundle(string name, out ChainBundleInfo result)
         {
             result = default;
             for (var i = 0; i < bundles.Count; i++)
@@ -27,7 +27,7 @@ public partial class Content
     }
 
     [Serializable]
-    public struct BundleInfo
+    public struct ChainBundleInfo
     {
         public string name;
         public uint crc;
@@ -38,9 +38,9 @@ public partial class Content
     [Serializable]
     public class AddonChain
     {
-        public List<AddonInfo> Addons = new List<AddonInfo>();
+        public List<ChainAddonInfo> Addons = new List<ChainAddonInfo>();
 
-        public bool HasAddon(string name, out AddonInfo result)
+        public bool HasAddon(string name, out ChainAddonInfo result)
         {
             result = default;
             for (var i = 0; i < Addons.Count; i++)
@@ -56,7 +56,7 @@ public partial class Content
             return false;
         }
 
-        public bool AddOrFindAddon(string name, out AddonInfo result)
+        public bool AddOrFindAddon(string name, out ChainAddonInfo result)
         {
             if (HasAddon(name, out result))
             {
@@ -64,7 +64,7 @@ public partial class Content
             }
             else
             {
-                result = new AddonInfo() { name = name, bundles = new List<BundleInfo>() };
+                result = new ChainAddonInfo() { name = name, bundles = new List<ChainBundleInfo>() };
                 Addons.Add(result);
             }
             return true;

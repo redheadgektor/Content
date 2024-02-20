@@ -1,7 +1,5 @@
 using System;
 using System.IO;
-using System.IO.Compression;
-using System.Text;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -10,16 +8,21 @@ using UnityEditor;
 public partial class Content : ScriptableObject
 {
     public const string FolderName = "Content";
-    public const string FileName = "content.json";
+    public const string ContentFileName = "content.json";
     public const string ChainFileName = "chain.json";
 
     public static string ContentFolder
     {
-        get { return Path.Combine(Environment.CurrentDirectory, FolderName); }
+        get { return $"{Environment.CurrentDirectory}/{FolderName}"; }
     }
-    public static string ContentFile
+    public static string GlobalContentFile
     {
-        get { return Path.Combine(Environment.CurrentDirectory, FolderName, FileName); }
+        get { return $"{ContentFolder}/{ContentFileName}"; }
+    }
+
+    public static string GlobalChainFile
+    {
+        get { return $"{ContentFolder}/{ChainFileName}"; }
     }
 
     static Content Instance;
@@ -30,54 +33,54 @@ public partial class Content : ScriptableObject
         LoadOrCreate();
 #endif
 #if !UNITY_EDITOR
-        Instance = CreateInstance<Content>();
-        LoadJSON();
+        if (!Instance)
+        {
+            Instance = CreateInstance<Content>();
+            RestoreGlobalJSON();
+        }
 #endif
         return Instance;
     }
 
 #if UNITY_EDITOR
-    [MenuItem("Content/Load/JSON")]
+    [MenuItem("Content/Backup (Json)/JSON")]
 #endif
-    public static void LoadJSON()
+    public static void RestoreGlobalJSON()
     {
-        if (File.Exists(ContentFile))
+        if (File.Exists(GlobalContentFile))
         {
             try
             {
-                JsonUtility.FromJsonOverwrite(File.ReadAllText(ContentFile), Get().Container);
+                JsonUtility.FromJsonOverwrite(File.ReadAllText(GlobalContentFile), Get().Container);
                 Debug.Log($"[{nameof(Content)}] Parsed {Instance.Container.Addons.Count} addons");
             }
             catch (Exception ex)
             {
                 Debug.LogError(
-                    $"[{nameof(Content)}] Error while parsing {ContentFile} -> {ex.Message}"
+                    $"[{nameof(Content)}] Error while parsing {GlobalContentFile} -> {ex.Message}"
                 );
             }
         }
     }
 
-    public static async void SaveToJson(bool pretty = true)
+    public static async void BackupGlobalJSON(bool pretty = true)
     {
         if (!Directory.Exists(ContentFolder))
         {
             Directory.CreateDirectory(ContentFolder);
         }
-        await File.WriteAllTextAsync(ContentFile, JsonUtility.ToJson(Get().Container, pretty));
+        await File.WriteAllTextAsync(GlobalContentFile, JsonUtility.ToJson(Get().Container, pretty));
     }
 
 #if UNITY_EDITOR
     public const string EditorFolder = "Assets/";
-    public static string EditorContentFile { get; private set; } =
-        Path.Combine(EditorFolder, "Content.asset");
-
-    public bool UseAssetDatabase = false;
-
-    [MenuItem("Content/LoadOrCreate")]
-    static void Editor_LoadOrCreate()
+    public static string EditorContentFile
     {
-        LoadOrCreate();
+        get { return $"{EditorFolder}/Content.asset"; }
     }
+
+    [Header("Don't load addons, use project assets")]
+    public bool UseAssetDatabase = false;
 
     private static Content LoadOrCreate()
     {
@@ -102,11 +105,11 @@ public partial class Content : ScriptableObject
         return Instance;
     }
 
-    [MenuItem("Content/Save (Json)/Non-Pretty")]
-    static void SaveToJson0() => SaveToJson(false);
+    [MenuItem("Content/Backup (Json)/Non-Pretty")]
+    static void SaveToJson0() => BackupGlobalJSON(false);
 
-    [MenuItem("Content/Save (Json)/Pretty")]
-    static void SaveToJson1() => SaveToJson(true);
+    [MenuItem("Content/Backup (Json)/Pretty")]
+    static void SaveToJson1() => BackupGlobalJSON(true);
 
     public static void SaveToAsset()
     {

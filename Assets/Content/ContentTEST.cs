@@ -1,45 +1,103 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using UnityEditor;
+using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using static Content;
 
 public class ContentTEST : MonoBehaviour
 {
-    string text;
 
-    List<AssetBundle> loadedBundles = new List<AssetBundle>();
+   void Start() 
+   {
+        DontDestroyOnLoad(this.gameObject);
+   }
 
-    void OnGUI()
+    Rect detectedAddons = new Rect(0,0,450,300);
+    Rect mountedAddons = new Rect(0, 0, 450, 300);
+
+    private void OnGUI()
     {
-        GUILayout.BeginHorizontal("box");
-        GUILayout.Label("Asset ");
-        text = GUILayout.TextField(text);
-        GUILayout.EndHorizontal();
-
-        if (GUILayout.Button("Find"))
+        foreach(var bundle in AssetBundle.GetAllLoadedAssetBundles())
         {
-            if (Content.Get().HasAsset(text, out var addon, out var bundle, out var asset))
+            if (GUILayout.Button($"Unload {bundle.name} (Assets: {bundle.GetAllAssetNames().Length}) (Scenes: {bundle.GetAllScenePaths().Length})"))
             {
-                if (Content.Get().GetChain().HasAddon(addon.Name, out var result_addon))
+                bundle.Unload(true);
+            }
+        }
+        if (GUILayout.Button("Detect Addons"))
+        {
+            int addons = ContentLoadingManager.Get().DetectAddons();
+            Debug.Log($"[Test] Detected "+addons+" addons");
+        }
+
+        detectedAddons = GUI.Window(0, detectedAddons, detectedAddonsWin, "Detected Addons");
+        mountedAddons = GUI.Window(1, mountedAddons, mountedAddonsWin, "Mounted Addons");
+    }
+
+    private void detectedAddonsWin(int id)
+    {
+        foreach(var addon in ContentLoadingManager.Get().DetectedAddons)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Box($"{addon.Key} by {addon.Value.addon.author} -> {addon.Value.addon.BundlesCount()}");
+            if (GUILayout.Button("Mount"))
+            {
+                Debug.Log($"{addon.Key} -> {ContentLoadingManager.Get().MountAddon(addon.Key, out var result)}");
+            }
+            if (GUILayout.Button("Unmount (unloadAssets)"))
+            {
+                ContentLoadingManager.Get().UnmountAddon(addon.Key, true);
+            }
+            if (GUILayout.Button("Unmount"))
+            {
+                ContentLoadingManager.Get().UnmountAddon(addon.Key);
+            }
+            GUILayout.EndHorizontal();
+        }
+        GUI.DragWindow(new Rect(0, 0, 10000, 20));
+    }
+
+    Vector2 scroll;
+
+    private void mountedAddonsWin(int id)
+    {
+        scroll = GUILayout.BeginScrollView(scroll);
+        for(var i = 0; i < ContentLoadingManager.Get().AddonsCount(); i++)
+        {
+            if (ContentLoadingManager.Get().GetAddon(i, out var addon))
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Box(addon.GetName());
+                GUILayout.BeginVertical();
+                GUILayout.Box("Bundles: " + addon.Bundles());
+                for (var a = 0; a < addon.Bundles(); a++)
                 {
-                    if (result_addon.HasBundle(bundle.name, out var result_chain_bundle))
+                    if (addon.GetBundle(a, out var bundle))
                     {
-                        var main_bundle_path = Path.Combine(Content.ContentFolder, addon.Name, result_chain_bundle.name);
-                        Debug.Log(
-                            $"{main_bundle_path} | Deps: {result_chain_bundle.dependencies.Length}"
-                        );
+                        GUILayout.Box($"{bundle.GetName()} {(bundle.GetMountStatus() == ContentLoadingManager.MountStatus.Loading ? $"{bundle.GetProgress()}%" : $"{bundle.GetMountStatus()}")} {(bundle.GetAssetBundle() ? bundle.GetAssetBundle().isStreamedSceneAssetBundle ? "StreamedScene" : string.Empty : string.Empty)}");
 
-                        foreach(var dp in result_chain_bundle.dependencies)
+                        if (bundle.GetAssetBundle() && bundle.GetAssetBundle().isStreamedSceneAssetBundle)
                         {
-                            var parts = dp.Split('@');
-
-                            var dep_bundle_path = Path.Combine(Content.ContentFolder, parts[0], parts[1]);
-                            Debug.Log($"{dep_bundle_path}");
+                            foreach(var scene in bundle.GetAssetBundle().GetAllScenePaths())
+                            {
+                                if(GUILayout.Button($"Load {scene}"))
+                                {
+                                    SceneManager.LoadScene(scene);
+                                }
+                            }
                         }
                     }
                 }
+                GUILayout.EndVertical();
+                GUILayout.EndHorizontal();
             }
         }
+
+        GUILayout.EndScrollView();
+
+        GUI.DragWindow(new Rect(0, 0, 10000, 20));
     }
 }

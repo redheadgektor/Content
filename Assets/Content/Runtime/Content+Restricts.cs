@@ -22,6 +22,7 @@ public partial class Content
         typeof(TextAsset),
         typeof(ScriptableObject),
         typeof(SceneAsset),
+        typeof(Mesh),
         typeof(Object)
     };
 

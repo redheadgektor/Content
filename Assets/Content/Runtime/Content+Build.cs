@@ -10,6 +10,7 @@ using BuildCompression = UnityEngine.BuildCompression;
 using UnityEditor.Build.Content;
 using CompressionType = UnityEngine.CompressionType;
 using System;
+using static Content;
 
 public partial class Content : ScriptableObject, IPostprocessBuildWithReport
 {
@@ -136,7 +137,7 @@ public partial class Content : ScriptableObject, IPostprocessBuildWithReport
         if (exitCode == ReturnCode.Success)
         {
             Debug.Log(
-                $"[{nameof(Content)}] Build {addon_bundle} finished! [Time: {DateTime.Now - dt}]"
+                $"[{nameof(Content)}] Build {addon_bundle} finished! [Time: {DateTime.Now - dt}] [CRC: {results.BundleInfos[addon_bundle].Crc}]"
             );
         }
         else
@@ -177,9 +178,8 @@ public partial class Content : ScriptableObject, IPostprocessBuildWithReport
 
         foreach (var bundle in target_bundles)
         {
-            if(bundle.AssetsCount() < 0)
+            if (bundle.AssetsCount() < 0)
             {
-
                 continue;
             }
 
@@ -225,7 +225,7 @@ public partial class Content : ScriptableObject, IPostprocessBuildWithReport
         }
     }
 
-    void BuildAll()
+    public void BuildAddon(Addon addon)
     {
         if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().isDirty)
         {
@@ -238,7 +238,147 @@ public partial class Content : ScriptableObject, IPostprocessBuildWithReport
         }
         AssetDatabase.SaveAssets();
 
-        var chain = new AddonChain();
+        var build_params = new ContentBuildParameters(
+            EditorUserBuildSettings.activeBuildTarget,
+            BuildTargetGroup.Standalone,
+            ContentFolder
+        )
+        {
+            WriteLinkXML = WriteLinkXML,
+            TempOutputFolder = $"{ContentFolder}/.TempContent",
+            UseCache = UseCache,
+            ContentBuildFlags = BuildFlags,
+            ContiguousBundles = ContiguousBundles,
+            DisableVisibleSubAssetRepresentations = DisableVisibleSubAssetRepresentations,
+            BundleCompression = BuildCompression.Uncompressed
+        };
+
+        var total_bundles = 0;
+        var total_bundles_builded = 0;
+
+        var addon_folder = Path.Combine(ContentFolder, addon.Name);
+        var addon_bundles = new List<AssetBundleBuild>();
+
+        var bundles_builded = 0;
+        total_bundles += addon.BundlesCount();
+        for (var j = 0; j < addon.BundlesCount(); j++)
+        {
+            if (addon.GetBundle(j, out var bundle))
+            {
+                //ignore if no assets
+                if (bundle.AssetsCount() == 0)
+                {
+                    Debug.LogWarning(
+                        $"[{nameof(Content)}] Bundle {addon.Name}/{bundle.name} ignored! (No Assets!)"
+                    );
+                    continue;
+                }
+
+                var addon_bundle = $"{addon.Name}/{bundle.name}";
+                build_params.PerBundleCompression.Add(
+                    addon_bundle,
+                    GetCompressionType(addon.Name, bundle.name)
+                );
+                var abb = new AssetBundleBuild();
+                abb.assetBundleName = addon_bundle;
+                abb.assetNames = new string[bundle.AssetsCount()];
+                abb.addressableNames = new string[bundle.AssetsCount()];
+
+                for (var k = 0; k < bundle.AssetsCount(); k++)
+                {
+                    if (bundle.GetAsset(k, out var asset))
+                    {
+                        abb.assetNames[k] = asset.path;
+                        abb.addressableNames[k] = asset.name;
+                    }
+                }
+
+                addon_bundles.Add(abb);
+                bundles_builded++;
+                total_bundles_builded++;
+            }
+        }
+
+
+        var buildContent = new BundleBuildContent(addon_bundles);
+        var dt = DateTime.Now;
+        ReturnCode exitCode = ContentPipeline.BuildAssetBundles(
+            build_params,
+            buildContent,
+            out var results
+        );
+
+        if (exitCode == ReturnCode.Success)
+        {
+            var GlobalChain = new AddonChain();
+
+            foreach (var report in results.BundleInfos)
+            {
+                var addon_name = report.Key.Split('/')[0];
+                var bundle_name = report.Key.Substring(addon_name.Length);
+
+                if (Get().HasAddon(addon_name, out var addon_result))
+                {
+                    if (GlobalChain.AddOrFindAddon(addon_name, out var chain_addon))
+                    {
+                        var bundle_info = new ChainBundleInfo
+                        {
+                            name = bundle_name.Substring(1),
+                            crc = report.Value.Crc,
+                            hash = report.Value.Hash.ToString(),
+                            dependencies = report.Value.Dependencies
+                        };
+
+                        //mark addons@bundle
+                        for (var i = 0; i < bundle_info.dependencies.Length; i++)
+                        {
+                            var parts = bundle_info.dependencies[i].Split('/');
+                            var addon_folder_name = parts[0];
+                            var bundle_path = parts[1];
+
+                            bundle_info.dependencies[i] = $"{addon_folder_name}@{bundle_path}";
+
+                            if (parts.Length >= 3)
+                            {
+                                for (var k = 2; k < parts.Length; k++)
+                                {
+                                    bundle_info.dependencies[i] += $"/{parts[k]}";
+                                }
+                            }
+                        }
+
+                        chain_addon.bundles.Add(bundle_info);
+                    }
+                }
+            }
+
+            File.WriteAllText($"{ContentFolder}/{addon.Name}/{ChainFileName}", JsonUtility.ToJson(addon, true));
+            File.WriteAllText($"{ContentFolder}/{addon.Name}/{ContentFileName}", JsonUtility.ToJson(addon, true));
+
+            BackupGlobalJSON(true);
+
+            Debug.Log(
+                $"[{nameof(Content)}] Build finished! [Bundles: {total_bundles_builded}/{total_bundles}] [Time: {DateTime.Now - dt}]"
+            );
+        }
+        else
+        {
+            Debug.LogError($"[{nameof(Content)}] Build error -> {exitCode}");
+        }
+    }
+
+    void BuildAll()
+    {
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().isDirty)
+        {
+            EditorUtility.DisplayDialog(
+                "ContentDatabase - Building",
+                "Unable to start archiving! There are unsaved scenes!",
+                "Close"
+            );
+            return;
+        }
+        AssetDatabase.SaveAssets();
 
         var build_params = new ContentBuildParameters(
             EditorUserBuildSettings.activeBuildTarget,
@@ -333,6 +473,8 @@ public partial class Content : ScriptableObject, IPostprocessBuildWithReport
 
         if (exitCode == ReturnCode.Success)
         {
+            var GlobalChain = new AddonChain();
+
             foreach (var report in results.BundleInfos)
             {
                 var addon_name = report.Key.Split('/')[0];
@@ -340,9 +482,9 @@ public partial class Content : ScriptableObject, IPostprocessBuildWithReport
 
                 if (Get().HasAddon(addon_name, out var addon))
                 {
-                    if (chain.AddOrFindAddon(addon_name, out var chain_addon))
+                    if (GlobalChain.AddOrFindAddon(addon_name, out var chain_addon))
                     {
-                        var bundle_info = new BundleInfo
+                        var bundle_info = new ChainBundleInfo
                         {
                             name = bundle_name.Substring(1),
                             crc = report.Value.Crc,
@@ -373,8 +515,25 @@ public partial class Content : ScriptableObject, IPostprocessBuildWithReport
                 }
             }
 
-            File.WriteAllText($"{ContentFolder}/{ChainFileName}", JsonUtility.ToJson(chain, true));
-            SaveToJson(true);
+            //write global chain
+            //File.WriteAllText(GlobalChainFile, JsonUtility.ToJson(GlobalChain, true));
+
+            //write chain for every addon
+            foreach (var addon in GlobalChain.Addons)
+            {
+                File.WriteAllText($"{ContentFolder}/{addon.name}/{ChainFileName}", JsonUtility.ToJson(addon, true));
+            }
+
+            //write content info for every addon
+            for (var i = 0; i < Get().AddonsCount(); i++)
+            {
+                if (Get().GetAddon(i, out var addon))
+                {
+                    File.WriteAllText($"{ContentFolder}/{addon.Name}/{ContentFileName}", JsonUtility.ToJson(addon, true));
+                }
+            }
+
+            BackupGlobalJSON(true);
 
             Debug.Log(
                 $"[{nameof(Content)}] Build finished! [Addons: {total_addons_builded}/{AddonsCount()}] [Bundles: {total_bundles_builded}/{total_bundles}] [Time: {DateTime.Now - dt}]"

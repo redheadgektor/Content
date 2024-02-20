@@ -694,6 +694,17 @@ public partial class ContentEditor : EditorWindow
                         OpenAddonEditor((item as AddonTreeViewItem).addon);
                     }
                 );
+
+                menu.AddItem(
+                        new GUIContent("Tool/Build"),
+                        false,
+                        delegate
+                        {
+                            Content
+                                .Get()
+                                .BuildAddon((item as AddonTreeViewItem).addon);
+                        }
+                    );
             }
 
             /* SHARED ITEM */
